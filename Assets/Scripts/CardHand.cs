@@ -7,8 +7,8 @@ public class CardHand : MonoBehaviour
     public GameObject card;
     public bool isDealer = false;
     public int points;
-    private int coordY;    
-     
+    private int coordY;
+
     private void Awake()
     {
         points = 0;
@@ -30,12 +30,12 @@ public class CardHand : MonoBehaviour
         {
             Destroy(g);
         }
-        cards.Clear();                        
-    }        
+        cards.Clear();
+    }
 
     public void InitialToggle()
     {
-        cards[0].GetComponent<CardModel>().ToggleFace(true);              
+        cards[0].GetComponent<CardModel>().ToggleFace(true);
     }
 
     public void Push(Sprite front, int value)
@@ -46,13 +46,13 @@ public class CardHand : MonoBehaviour
 
         //La posicionamos en el tablero 
         float coordX = (float)1.4 * (float)(cards.Count - 4);
-        Vector3 pos = new Vector3(coordX, coordY);               
+        Vector3 pos = new Vector3(coordX, coordY);
         cardCopy.transform.position = pos;
 
         //Le ponemos la imagen y el valor asignado
         cardCopy.GetComponent<CardModel>().front = front;
         cardCopy.GetComponent<CardModel>().value = value;
-        
+
         //La cubrimos si es la primera del dealer
         if (isDealer && cards.Count <= 1)
             cardCopy.GetComponent<CardModel>().ToggleFace(false);
@@ -63,7 +63,7 @@ public class CardHand : MonoBehaviour
         int val = 0;
         int aces = 0;
         foreach (GameObject f in cards)
-        {            
+        {
 
             if (f.GetComponent<CardModel>().value != 11)
                 val += f.GetComponent<CardModel>().value;
@@ -84,8 +84,8 @@ public class CardHand : MonoBehaviour
         }
 
         points = val;
-       
+
     }
-     
+
 
 }

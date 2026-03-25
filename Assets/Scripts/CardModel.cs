@@ -19,11 +19,11 @@ public class CardModel : MonoBehaviour
     {
         if (showFace)
         {
-            spriteRenderer.sprite = front;            
+            spriteRenderer.sprite = front;
         }
         else
         {
-            spriteRenderer.sprite = cardBack;            
+            spriteRenderer.sprite = cardBack;
         }
     }
 
