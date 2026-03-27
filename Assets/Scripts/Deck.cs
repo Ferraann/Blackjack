@@ -34,8 +34,6 @@ public class Deck : MonoBehaviour
         stickButton.interactable = false;
         finalMessage.text = "Elige apuesta y pulsa Play";
         UpdateBankUI();
-
-        // Eliminamos ShuffleCards() y StartGame() de aquí
     }
 
     private void InitCardValues()
@@ -43,7 +41,6 @@ public class Deck : MonoBehaviour
         for (int i = 0; i < 52; i++)
         {
             int cardRank = i % 13;
-
             if (cardRank == 0) values[i] = 11;
             else if (cardRank >= 1 && cardRank <= 9) values[i] = cardRank + 1;
             else values[i] = 10;
@@ -52,9 +49,9 @@ public class Deck : MonoBehaviour
 
     private void ShuffleCards()
     {
-        for (int i = 0; i < 52; i++)
+        for (int i = 51; i > 0; i--)
         {
-            int randomIndex = Random.Range(i, 52);
+            int randomIndex = Random.Range(0, i + 1);
             Sprite tempFace = faces[i];
             faces[i] = faces[randomIndex];
             faces[randomIndex] = tempFace;
@@ -66,29 +63,27 @@ public class Deck : MonoBehaviour
 
     void StartGame()
     {
-        // Gestión de la apuesta inicial
-        int betValue = int.Parse(betDropdown.options[betDropdown.value].text);
+        // --- MÉTODO DE TU COMPAÑERO PARA LAS APUESTAS ---
+        // (Evita errores si tienes puesto "10 Credits" en vez de solo "10")
+        currentBet = GetBetFromDropdown();
 
-        if (bank >= betValue)
+        if (bank >= currentBet)
         {
-            currentBet = betValue;
             bank -= currentBet;
             UpdateBankUI();
         }
         else
         {
-            // Si intenta apostar más de lo que tiene, le cobramos todo su saldo
             currentBet = bank;
             bank = 0;
             UpdateBankUI();
         }
 
-        // Repartimos dos cartas a cada uno
-        for (int i = 0; i < 2; i++)
-        {
-            PushPlayer();
-            PushDealer();
-        }
+        // Repartimos usando exactamente el mismo orden de tu compañero
+        PushPlayer();
+        PushDealer();
+        PushPlayer();
+        PushDealer();
 
         int playerPoints = player.GetComponent<CardHand>().points;
         int dealerPoints = dealer.GetComponent<CardHand>().points;
@@ -116,82 +111,72 @@ public class Deck : MonoBehaviour
 
             UpdateBankUI();
             betDropdown.interactable = true;
-            playAgainButton.interactable = true; // Reactivamos Play
+            playAgainButton.interactable = true;
         }
     }
 
+    // ─────────────────────────────────────────────
+    // MÉTODO EXACTO DE TU COMPAÑERO PARA LA PROBABILIDAD
+    // ─────────────────────────────────────────────
     private void CalculateProbabilities()
     {
-        // Obtenemos los puntos actuales del jugador
         int playerPoints = player.GetComponent<CardHand>().points;
         int remainingCards = 52 - cardIndex;
 
-        // Evitar división por cero si se acaban las cartas (improbable en una sola mano, pero seguro)
         if (remainingCards <= 0)
         {
-            probMessage.text = "Deal > Play: 0\n17<=X<=21: 0\nX > 21: 0";
+            if (probMessage != null)
+                probMessage.text = "Probabilidades:\nDeal > Play: -\n17<=X<=21: -\nX > 21: -";
             return;
         }
 
+        // --- Prob 1: Con la carta oculta, ¿el dealer supera al jugador? ---
         int dealerWinCount = 0;
+        for (int i = cardIndex; i < 52; i++)
+        {
+            int hiddenVal = values[i];
+            int dealerTotal = dealer.GetComponent<CardHand>().points;
+
+            if (dealerTotal > playerPoints)
+                dealerWinCount++;
+        }
+        float probDealerWin = (float)dealerWinCount / remainingCards;
+
+        // --- Prob 2: Probabilidad de que el jugador obtenga 17-21 pidiendo una carta ---
         int hit17to21 = 0;
         int hitOver21 = 0;
 
-        // Simulamos sacar cada una de las cartas que quedan en el mazo
         for (int i = cardIndex; i < 52; i++)
         {
             int newVal = values[i];
-
-            // --- Prob 1: ¿El dealer supera al jugador? ---
-            // Tomamos los puntos reales actuales del dealer
-            int dealerTotal = dealer.GetComponent<CardHand>().points;
-
-            // Si el dealer ya tiene más puntos, cuenta como victoria para él.
-            // (Esta es una simplificación de estimación similar a la del otro código)
-            if (dealerTotal > playerPoints)
-            {
-                dealerWinCount++;
-            }
-
-            // --- Prob 2 y 3: Probabilidad del jugador pidiendo carta ---
             int newPoints = playerPoints;
 
-            // Calcular nueva puntuación teniendo en cuenta el valor del As
             if (newVal == 11)
-            {
                 newPoints += (playerPoints + 11 <= 21) ? 11 : 1;
-            }
             else
-            {
                 newPoints += newVal;
-            }
 
-            // Si se pasa de 21, comprobamos si tiene un As previo contado como 11 que pueda bajar a 1
             if (newPoints > 21 && playerPoints + newVal - 10 <= 21 && newVal == 11)
-            {
                 newPoints = playerPoints + 1;
-            }
 
-            // Clasificamos el resultado
             if (newPoints >= 17 && newPoints <= 21)
-            {
                 hit17to21++;
-            }
             else if (newPoints > 21)
-            {
                 hitOver21++;
-            }
         }
 
-        // Calculamos los porcentajes (casos favorables / cartas restantes)
-        float probDealerWin = (float)dealerWinCount / remainingCards;
         float prob17to21 = (float)hit17to21 / remainingCards;
         float probOver21 = (float)hitOver21 / remainingCards;
 
-        probMessage.text = "Deal > Play: " + probDealerWin.ToString("F4") + "\n" +
-                           "17<=X<=21: " + prob17to21.ToString("F4") + "\n" +
-                           "X>21: " + probOver21.ToString("F4");
+        if (probMessage != null)
+        {
+            probMessage.text = "Probabilidades:\n" +
+                               "Deal > Play: " + probDealerWin.ToString("F4") + "\n" +
+                               "17<=X<=21: " + prob17to21.ToString("F4") + "\n" +
+                               "X>21: " + probOver21.ToString("F4");
+        }
     }
+    // ─────────────────────────────────────────────
 
     void PushDealer()
     {
@@ -203,6 +188,8 @@ public class Deck : MonoBehaviour
     {
         player.GetComponent<CardHand>().Push(faces[cardIndex], values[cardIndex]);
         cardIndex++;
+
+        // Lo ponemos de vuelta aquí adentro, tal y como lo tiene él
         CalculateProbabilities();
     }
 
@@ -218,7 +205,7 @@ public class Deck : MonoBehaviour
             finalMessage.text = "¡Te has pasado de 21! Has perdido.";
 
             betDropdown.interactable = true;
-            playAgainButton.interactable = true; // Reactivamos Play
+            playAgainButton.interactable = true;
         }
     }
 
@@ -262,12 +249,11 @@ public class Deck : MonoBehaviour
         UpdateBankUI();
 
         betDropdown.interactable = true;
-        playAgainButton.interactable = true; // Reactivamos Play
+        playAgainButton.interactable = true;
     }
 
     public void PlayAgain()
     {
-        // Bloqueamos menú al empezar
         betDropdown.interactable = false;
         playAgainButton.interactable = false;
 
@@ -289,5 +275,12 @@ public class Deck : MonoBehaviour
         {
             bankText.text = "Credito: " + bank.ToString();
         }
+    }
+
+    // Usamos el helper de tu compañero para leer el desplegable sin crasheos
+    private int GetBetFromDropdown()
+    {
+        if (betDropdown == null) return 10;
+        return (betDropdown.value + 1) * 10;
     }
 }
