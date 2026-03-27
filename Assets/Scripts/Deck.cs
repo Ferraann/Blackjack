@@ -5,6 +5,7 @@ using TMPro;
 
 public class Deck : MonoBehaviour
 {
+    // --- VARIABLES DE INTERFAZ Y OBJETOS ---
     public Sprite[] faces;
     public GameObject dealer;
     public GameObject player;
@@ -14,57 +15,67 @@ public class Deck : MonoBehaviour
     public Text finalMessage;
     public Text probMessage;
 
+    // --- VARIABLES DE LA BANCA ---
     public Text bankText;
     public TMP_Dropdown betDropdown;
     private int bank = 1000;
     private int currentBet = 0;
 
+    // --- VARIABLES DEL MAZO ---
     public int[] values = new int[52];
     int cardIndex = 0;
 
     private void Awake()
     {
+        // Prepara los valores de las cartas nada más cargar el juego
         InitCardValues();
     }
 
     private void Start()
     {
-        // Estado inicial: bloqueamos todo hasta que pulse Play
+        // ESTADO INICIAL: Bloqueamos los botones de juego para obligar al jugador 
+        // a elegir su apuesta y pulsar "Play" antes de repartir cartas.
         hitButton.interactable = false;
         stickButton.interactable = false;
         finalMessage.text = "Elige apuesta y pulsa Play";
         UpdateBankUI();
     }
 
+    // Función que asigna los puntos correspondientes a cada carta de la baraja
     private void InitCardValues()
     {
         for (int i = 0; i < 52; i++)
         {
+            // El módulo 13 nos da la posición de la carta dentro de su palo (0 a 12)
             int cardRank = i % 13;
-            if (cardRank == 0) values[i] = 11;
-            else if (cardRank >= 1 && cardRank <= 9) values[i] = cardRank + 1;
-            else values[i] = 10;
+            if (cardRank == 0) values[i] = 11; // Posición 0 es el As
+            else if (cardRank >= 1 && cardRank <= 9) values[i] = cardRank + 1; // Cartas numéricas (2-10)
+            else values[i] = 10; // Figuras (J, Q, K)
         }
     }
 
+    // Función que mezcla la baraja usando el algoritmo Fisher-Yates
     private void ShuffleCards()
     {
         for (int i = 51; i > 0; i--)
         {
+            // Elige una posición al azar e intercambia tanto la imagen como el valor
             int randomIndex = Random.Range(0, i + 1);
+
             Sprite tempFace = faces[i];
             faces[i] = faces[randomIndex];
             faces[randomIndex] = tempFace;
+
             int tempValue = values[i];
             values[i] = values[randomIndex];
             values[randomIndex] = tempValue;
         }
     }
 
+    // Función que arranca la ronda al pulsar Play
     void StartGame()
     {
-        // --- MÉTODO DE TU COMPAÑERO PARA LAS APUESTAS ---
-        // (Evita errores si tienes puesto "10 Credits" en vez de solo "10")
+        // 1. GESTIÓN DE APUESTA: Cobramos el dinero antes de jugar
         currentBet = GetBetFromDropdown();
 
         if (bank >= currentBet)
@@ -74,12 +85,13 @@ public class Deck : MonoBehaviour
         }
         else
         {
+            // Si intenta apostar más de lo que tiene, le apostamos lo que le queda
             currentBet = bank;
             bank = 0;
             UpdateBankUI();
         }
 
-        // Repartimos usando exactamente el mismo orden de tu compañero
+        // 2. REPARTO INICIAL: 2 cartas alternas para cada uno
         PushPlayer();
         PushDealer();
         PushPlayer();
@@ -88,6 +100,7 @@ public class Deck : MonoBehaviour
         int playerPoints = player.GetComponent<CardHand>().points;
         int dealerPoints = dealer.GetComponent<CardHand>().points;
 
+        // 3. COMPROBACIÓN DE BLACKJACK: Si alguien saca 21 con las 2 primeras cartas, la ronda acaba
         if (playerPoints == 21 || dealerPoints == 21)
         {
             dealer.GetComponent<CardHand>().InitialToggle();
@@ -97,12 +110,12 @@ public class Deck : MonoBehaviour
             if (playerPoints == 21 && dealerPoints == 21)
             {
                 finalMessage.text = "¡Empate a Blackjack!";
-                bank += currentBet;
+                bank += currentBet; // Se devuelve la apuesta
             }
             else if (playerPoints == 21)
             {
                 finalMessage.text = "¡Blackjack! Has ganado.";
-                bank += currentBet * 2;
+                bank += currentBet * 2; // Gana el doble
             }
             else
             {
@@ -115,9 +128,7 @@ public class Deck : MonoBehaviour
         }
     }
 
-    // ─────────────────────────────────────────────
-    // MÉTODO EXACTO DE TU COMPAÑERO PARA LA PROBABILIDAD
-    // ─────────────────────────────────────────────
+    // Función matemática que calcula las probabilidades basándose en las cartas que quedan sin repartir
     private void CalculateProbabilities()
     {
         int playerPoints = player.GetComponent<CardHand>().points;
@@ -130,27 +141,24 @@ public class Deck : MonoBehaviour
             return;
         }
 
-        // --- Prob 1: Con la carta oculta, ¿el dealer supera al jugador? ---
         int dealerWinCount = 0;
-        for (int i = cardIndex; i < 52; i++)
-        {
-            int hiddenVal = values[i];
-            int dealerTotal = dealer.GetComponent<CardHand>().points;
-
-            if (dealerTotal > playerPoints)
-                dealerWinCount++;
-        }
-        float probDealerWin = (float)dealerWinCount / remainingCards;
-
-        // --- Prob 2: Probabilidad de que el jugador obtenga 17-21 pidiendo una carta ---
         int hit17to21 = 0;
         int hitOver21 = 0;
 
+        // Simulamos qué pasaría si saliera cada una de las cartas que quedan en el mazo
         for (int i = cardIndex; i < 52; i++)
         {
             int newVal = values[i];
+
+            // ESTIMACIÓN DEL DEALER: ¿Gana el dealer con sus puntos actuales?
+            int dealerTotal = dealer.GetComponent<CardHand>().points;
+            if (dealerTotal > playerPoints)
+                dealerWinCount++;
+
+            // ESTIMACIÓN DEL JUGADOR: ¿Qué pasa si el jugador pide una carta más?
             int newPoints = playerPoints;
 
+            // Lógica para que el As valga 1 u 11 sin pasarnos de 21
             if (newVal == 11)
                 newPoints += (playerPoints + 11 <= 21) ? 11 : 1;
             else
@@ -159,12 +167,15 @@ public class Deck : MonoBehaviour
             if (newPoints > 21 && playerPoints + newVal - 10 <= 21 && newVal == 11)
                 newPoints = playerPoints + 1;
 
+            // Contabilizamos si la carta nos favorece (17-21) o nos hace perder (>21)
             if (newPoints >= 17 && newPoints <= 21)
                 hit17to21++;
             else if (newPoints > 21)
                 hitOver21++;
         }
 
+        // Calculamos los porcentajes finales y los mostramos en el formato requerido
+        float probDealerWin = (float)dealerWinCount / remainingCards;
         float prob17to21 = (float)hit17to21 / remainingCards;
         float probOver21 = (float)hitOver21 / remainingCards;
 
@@ -176,30 +187,32 @@ public class Deck : MonoBehaviour
                                "X>21: " + probOver21.ToString("F4");
         }
     }
-    // ─────────────────────────────────────────────
 
+    // Reparte una carta al Dealer
     void PushDealer()
     {
         dealer.GetComponent<CardHand>().Push(faces[cardIndex], values[cardIndex]);
         cardIndex++;
     }
 
+    // Reparte una carta al Jugador y recalcula las probabilidades al instante
     void PushPlayer()
     {
         player.GetComponent<CardHand>().Push(faces[cardIndex], values[cardIndex]);
         cardIndex++;
 
-        // Lo ponemos de vuelta aquí adentro, tal y como lo tiene él
         CalculateProbabilities();
     }
 
+    // Función ejecutada por el botón HIT (Pedir carta)
     public void Hit()
     {
         PushPlayer();
 
+        // REGLA DE DERROTA: Si al pedir te pasas de 21, pierdes inmediatamente
         if (player.GetComponent<CardHand>().points > 21)
         {
-            dealer.GetComponent<CardHand>().InitialToggle();
+            dealer.GetComponent<CardHand>().InitialToggle(); // Volteamos la carta del dealer por cortesía
             hitButton.interactable = false;
             stickButton.interactable = false;
             finalMessage.text = "¡Te has pasado de 21! Has perdido.";
@@ -209,8 +222,10 @@ public class Deck : MonoBehaviour
         }
     }
 
+    // Función ejecutada por el botón STAND (Plantarse)
     public void Stand()
     {
+        // 1. Termina el turno del jugador y se revela la carta oculta del crupier
         dealer.GetComponent<CardHand>().InitialToggle();
         hitButton.interactable = false;
         stickButton.interactable = false;
@@ -218,11 +233,13 @@ public class Deck : MonoBehaviour
         CardHand dealerHand = dealer.GetComponent<CardHand>();
         CardHand playerHand = player.GetComponent<CardHand>();
 
+        // 2. IA DEL CRUPIER: Por reglas del casino, está obligado a pedir mientras tenga 16 o menos
         while (dealerHand.points <= 16)
         {
             PushDealer();
         }
 
+        // 3. RESOLUCIÓN: Comparamos puntos finales y repartimos el dinero
         int pPoints = playerHand.points;
         int dPoints = dealerHand.points;
 
@@ -252,6 +269,7 @@ public class Deck : MonoBehaviour
         playAgainButton.interactable = true;
     }
 
+    // Función para reiniciar la mesa y jugar otra ronda
     public void PlayAgain()
     {
         betDropdown.interactable = false;
@@ -269,6 +287,7 @@ public class Deck : MonoBehaviour
         StartGame();
     }
 
+    // Actualiza el texto en pantalla de la banca
     private void UpdateBankUI()
     {
         if (bankText != null)
@@ -277,7 +296,7 @@ public class Deck : MonoBehaviour
         }
     }
 
-    // Usamos el helper de tu compañero para leer el desplegable sin crasheos
+    // Transforma la posición del desplegable en euros (Posición 0 = 10, Posición 1 = 20...)
     private int GetBetFromDropdown()
     {
         if (betDropdown == null) return 10;
