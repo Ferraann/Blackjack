@@ -200,7 +200,7 @@ public class Deck : MonoBehaviour
     {
         player.GetComponent<CardHand>().Push(faces[cardIndex], values[cardIndex]);
         cardIndex++;
-
+            
         CalculateProbabilities();
     }
 
